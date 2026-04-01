@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>טורניר נוקאאוט</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; min-height: 100vh; direction: rtl; }
+
+  /* INPUT SCREEN */
+  #input-screen {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; min-height: 100vh; padding: 20px;
+  }
+  #input-screen h1 { font-size: 2rem; color: #1a3a5c; margin-bottom: 20px; }
+  #input-screen p { color: #555; margin-bottom: 12px; }
+  #teams-input {
+    width: 340px; height: 320px; padding: 12px; font-size: 15px;
+    border: 2px solid #1a3a5c; border-radius: 8px; resize: none;
+    font-family: inherit; direction: rtl;
+  }
+  #error-msg { color: #c0392b; margin-top: 8px; font-size: 14px; min-height: 20px; }
+  #confirm-btn {
+    margin-top: 14px; padding: 12px 40px; font-size: 16px; font-weight: bold;
+    background: #1a3a5c; color: white; border: none; border-radius: 8px; cursor: pointer;
+    transition: background 0.2s;
+  }
+  #confirm-btn:hover { background: #2563a8; }
+
+  /* BRACKET SCREEN */
+  #bracket-screen { display: none; padding: 20px; }
+  #bracket-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 10px;
+  }
+  #bracket-header h1 { font-size: 1.6rem; color: #1a3a5c; }
+  #play-btn {
+    padding: 10px 36px; font-size: 16px; font-weight: bold;
+    background: #27ae60; color: white; border: none; border-radius: 8px;
+    cursor: pointer; transition: background 0.2s;
+  }
+  #play-btn:hover:not(:disabled) { background: #1e8449; }
+  #play-btn:disabled { background: #95a5a6; cursor: default; }
+  #reset-btn {
+    padding: 10px 24px; font-size: 15px; background: #e74c3c; color: white;
+    border: none; border-radius: 8px; cursor: pointer;
+  }
+  #reset-btn:hover { background: #c0392b; }
+
+  /* BRACKET LAYOUT */
+  #bracket-wrap {
+    overflow-x: auto; padding-bottom: 20px;
+  }
+  #bracket {
+    display: grid;
+    grid-template-columns: 140px 120px 100px 90px 140px 90px 100px 120px 140px;
+    grid-template-rows: repeat(32, 22px);
+    gap: 0;
+    min-width: 960px;
+    align-items: center;
+    position: relative;
+  }
+
+  /* MATCH SLOT */
+  .team-box {
+    height: 26px; border-radius: 4px; font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; padding: 0 8px;
+    background: #2c5282; color: #fff; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; margin: 1px 4px; border: 1px solid #1a3a5c;
+    transition: background 0.3s;
+  }
+  .team-box.empty { background: #b0bec5; color: #555; border-color: #90a4ae; font-weight: 400; }
+  .team-box.winner { background: #1a7a4a; border-color: #145c38; }
+  .team-box.loser { background: #546e7a; opacity: 0.5; border-color: #455a64; }
+  .team-box.champion { background: #c0841a; border-color: #9a6614; font-size: 13px; }
+
+  /* ROUND LABELS */
+  .round-label {
+    font-size: 11px; font-weight: bold; color: #1a3a5c; text-align: center;
+    padding: 2px 0; white-space: nowrap;
+  }
+
+  /* CONNECTOR LINES using borders */
+  .line-right-top { border-top: 2px solid #90a4ae; border-right: 2px solid #90a4ae; height: 50%; align-self: end; margin: 0; }
+  .line-right-bot { border-bottom: 2px solid #90a4ae; border-right: 2px solid #90a4ae; height: 50%; align-self: start; margin: 0; }
+  .line-left-top  { border-top: 2px solid #90a4ae; border-left: 2px solid #90a4ae; height: 50%; align-self: end; margin: 0; }
+  .line-left-bot  { border-bottom: 2px solid #90a4ae; border-left: 2px solid #90a4ae; height: 50%; align-self: start; margin: 0; }
+  .line-h-right { border-top: 2px solid #90a4ae; height: 1px; align-self: center; margin: 0; }
+  .line-h-left  { border-top: 2px solid #90a4ae; height: 1px; align-self: center; margin: 0; }
+
+  /* WINNER BANNER */
+  #winner-banner {
+    display: none; text-align: center; padding: 30px 20px;
+    background: linear-gradient(135deg, #1a3a5c, #2563a8);
+    color: white; border-radius: 16px; margin: 20px auto;
+    max-width: 500px;
+  }
+  #winner-banner h2 { font-size: 2rem; margin-bottom: 16px; }
+  .podium { display: flex; flex-direction: column; gap: 10px; font-size: 1.1rem; }
+  .podium .place { background: rgba(255,255,255,0.15); border-radius: 8px; padding: 10px 20px; }
+  .podium .place span { font-size: 1.4rem; margin-left: 8px; }
+</style>
+</head>
+<body>
+
+<!-- INPUT SCREEN -->
+<div id="input-screen">
+  <h1>טורניר נוקאאוט — 16 קבוצות</h1>
+  <p>הזן שם קבוצה בכל שורה (16 קבוצות):</p>
+  <textarea id="teams-input" placeholder="קבוצה 1&#10;קבוצה 2&#10;קבוצה 3&#10;..."></textarea>
+  <div id="error-msg"></div>
+  <button id="confirm-btn" onclick="startTournament()">אישור</button>
+</div>
+
+<!-- BRACKET SCREEN -->
+<div id="bracket-screen">
+  <div id="bracket-header">
+    <h1>טורניר נוקאאוט</h1>
+    <div style="display:flex;gap:10px">
+      <button id="play-btn" onclick="playNext()">▶ שחק</button>
+      <button id="reset-btn" onclick="resetAll()">אתחל</button>
+    </div>
+  </div>
+  <div id="winner-banner">
+    <h2>סיום הטורניר!</h2>
+    <div class="podium">
+      <div class="place"><span>🥇</span><strong id="p1"></strong></div>
+      <div class="place"><span>🥈</span><strong id="p2"></strong></div>
+      <div class="place"><span>🥉</span><strong id="p3"></strong></div>
+    </div>
+  </div>
+  <div id="bracket-wrap">
+    <div id="bracket"></div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+// Matches array index map:
+// 0-7  : R16 (left 0-3, right 4-7)
+// 8-11 : QF  (left 8-9, right 10-11)
+// 12-13: SF  (left 12, right 13)
+// 14   : 3rd place
+// 15   : Final
+
+let M = []; // matches
+
+function initMatches(teams) {
+  // Shuffle teams
+  let t = [...teams];
+  for (let i = t.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [t[i], t[j]] = [t[j], t[i]];
+  }
+  M = [];
+  // R16: matches 0-7, pairs: (0,1),(2,3),(4,5),(6,7),(8,9),(10,11),(12,13),(14,15)
+  for (let i = 0; i < 8; i++) {
+    M.push({ round:'r16', t1: t[i*2], t2: t[i*2+1], winner: null, loser: null });
+  }
+  // QF: 8-11
+  for (let i = 0; i < 4; i++) {
+    M.push({ round:'qf', t1: null, t2: null, winner: null, loser: null });
+  }
+  // SF: 12-13
+  M.push({ round:'sf', t1: null, t2: null, winner: null, loser: null });
+  M.push({ round:'sf', t1: null, t2: null, winner: null, loser: null });
+  // 3rd: 14
+  M.push({ round:'3rd', t1: null, t2: null, winner: null, loser: null });
+  // Final: 15
+  M.push({ round:'final', t1: null, t2: null, winner: null, loser: null });
+}
+
+function startTournament() {
+  const raw = document.getElementById('teams-input').value;
+  const teams = raw.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+  const err = document.getElementById('error-msg');
+  if (teams.length !== 16) {
+    err.textContent = `נדרשות בדיוק 16 קבוצות. הוזנו: ${teams.length}`;
+    return;
+  }
+  err.textContent = '';
+  initMatches(teams);
+  document.getElementById('input-screen').style.display = 'none';
+  document.getElementById('bracket-screen').style.display = 'block';
+  renderBracket();
+}
+
+function resetAll() {
+  document.getElementById('bracket-screen').style.display = 'none';
+  document.getElementById('input-screen').style.display = 'flex';
+  document.getElementById('winner-banner').style.display = 'none';
+  document.getElementById('teams-input').value = '';
+}
+
+// ─── PLAY ────────────────────────────────────────────────────────────────────
+function playNext() {
+  // Find first match that has both teams and no winner
+  const order = [0,1,2,3,4,5,6,7, 8,9,10,11, 12,13, 14, 15];
+  for (const i of order) {
+    const m = M[i];
+    if (m.t1 && m.t2 && !m.winner) {
+      const win = Math.random() < 0.5 ? m.t1 : m.t2;
+      const lose = win === m.t1 ? m.t2 : m.t1;
+      m.winner = win;
+      m.loser = lose;
+      feedResult(i, win, lose);
+      renderBracket();
+      checkDone();
+      return;
+    }
+  }
+}
+
+function feedResult(i, win, lose) {
+  // R16 → QF
+  // R16 0,1 → QF 8 (t1,t2); R16 2,3 → QF 9; R16 4,5 → QF 10; R16 6,7 → QF 11
+  if (i >= 0 && i <= 7) {
+    const qfIdx = 8 + Math.floor(i / 2);
+    if (i % 2 === 0) M[qfIdx].t1 = win; else M[qfIdx].t2 = win;
+  }
+  // QF → SF
+  // QF 8,9 → SF 12; QF 10,11 → SF 13
+  else if (i >= 8 && i <= 11) {
+    const sfIdx = 12 + Math.floor((i - 8) / 2);
+    if ((i - 8) % 2 === 0) M[sfIdx].t1 = win; else M[sfIdx].t2 = win;
+  }
+  // SF → Final + 3rd
+  else if (i === 12) {
+    M[15].t1 = win;
+    M[14].t1 = lose;
+  } else if (i === 13) {
+    M[15].t2 = win;
+    M[14].t2 = lose;
+  }
+}
+
+function checkDone() {
+  if (M[15].winner && M[14].winner) {
+    document.getElementById('p1').textContent = M[15].winner;
+    document.getElementById('p2').textContent = M[15].loser;
+    document.getElementById('p3').textContent = M[14].winner;
+    document.getElementById('winner-banner').style.display = 'block';
+    document.getElementById('play-btn').disabled = true;
+  }
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function tb(name, matchIdx, which) {
+  const m = M[matchIdx];
+  const val = m[which]; // t1 or t2
+  let cls = 'team-box';
+  if (!val) cls += ' empty';
+  else if (m.winner === val) cls += ' winner';
+  else if (m.loser === val) cls += ' loser';
+  return `<div class="${cls}" title="${val||''}">${val || '---'}</div>`;
+}
+
+function renderBracket() {
+  // We'll build the bracket as an HTML table-like structure
+  // Layout: left-R16 | left-QF | left-SF | center(SF feed+Final+3rd) | right-SF | right-QF | right-R16
+  // Use flex columns
+
+  const B = document.getElementById('bracket');
+  B.innerHTML = '';
+  B.style.display = 'flex';
+  B.style.alignItems = 'stretch';
+  B.style.gap = '0';
+  B.style.minWidth = '960px';
+  B.style.minHeight = '600px';
+
+  // Helper: create a match pair (two team boxes stacked)
+  function matchDiv(idx, label) {
+    const m = M[idx];
+    const d = document.createElement('div');
+    d.style.display = 'flex';
+    d.style.flexDirection = 'column';
+    d.style.justifyContent = 'center';
+    d.style.gap = '2px';
+    if (label) {
+      const l = document.createElement('div');
+      l.style.cssText = 'font-size:10px;font-weight:bold;color:#1a3a5c;text-align:center;margin-bottom:2px;';
+      l.textContent = label;
+      d.appendChild(l);
+    }
+    d.innerHTML += teamBoxHTML(m.t1, m.winner, m.loser) + teamBoxHTML(m.t2, m.winner, m.loser);
+    return d;
+  }
+
+  function teamBoxHTML(val, winner, loser) {
+    let cls = 'team-box';
+    if (!val) cls += ' empty';
+    else if (winner === val) cls += ' winner';
+    else if (loser === val) cls += ' loser';
+    const display = val || '---';
+    return `<div class="${cls}" title="${val||''}">${display}</div>`;
+  }
+
+  function connector(vertical) {
+    // A simple line element
+    const d = document.createElement('div');
+    d.style.cssText = `width:12px;border-left:2px solid #90a4ae;align-self:stretch;`;
+    return d;
+  }
+
+  function vConnectorColumn(pairs) {
+    // pairs: array of {top, bot} pixel fractions for bracket connectors
+    const d = document.createElement('div');
+    d.style.cssText = 'width:12px;display:flex;flex-direction:column;position:relative;';
+    return d;
+  }
+
+  // We'll build columns: R16-L, conn, QF-L, conn, SF-L, conn, CENTER, conn, SF-R, conn, QF-R, conn, R16-R
+  // Each column is a flex column
+
+  function col(flex, alignItems) {
+    const d = document.createElement('div');
+    d.style.cssText = `flex:${flex||'0 0 auto'};display:flex;flex-direction:column;${alignItems?'align-items:'+alignItems+';':''}`;
+    return d;
+  }
+
+  function spacer(flex) {
+    const d = document.createElement('div');
+    d.style.flex = flex || '1';
+    return d;
+  }
+
+  function hLine() {
+    const d = document.createElement('div');
+    d.style.cssText = 'height:2px;background:#90a4ae;align-self:stretch;';
+    return d;
+  }
+
+  // ── LEFT R16 column (4 matches, evenly spaced) ──
+  const r16L = col('0 0 140px');
+  r16L.style.justifyContent = 'space-around';
+  r16L.style.padding = '10px 0';
+  const lR16Label = document.createElement('div');
+  lR16Label.style.cssText = 'font-size:11px;font-weight:bold;color:#1a3a5c;text-align:center;padding:2px 0;';
+  lR16Label.textContent = 'שמינית גמר';
+  r16L.appendChild(lR16Label);
+  for (let i = 0; i < 4; i++) r16L.appendChild(matchDiv(i));
+  B.appendChild(r16L);
+
+  // connector L R16→QF
+  const connLR16 = col('0 0 16px');
+  connLR16.style.justifyContent = 'space-around';
+  connLR16.style.padding = '32px 0 10px';
+  // 4 pairs → 4 right-bracket connectors
+  for (let i = 0; i < 4; i++) {
+    const g = document.createElement('div');
+    g.style.cssText = 'display:flex;flex-direction:column;flex:1;justify-content:center;';
+    const top = document.createElement('div');
+    top.style.cssText = 'flex:1;border-bottom:2px solid #90a4ae;border-right:2px solid #90a4ae;';
+    const bot = document.createElement('div');
+    bot.style.cssText = 'flex:1;border-top:0;border-right:2px solid #90a4ae;';
+    g.appendChild(top); g.appendChild(bot);
+    connLR16.appendChild(g);
+  }
+  B.appendChild(connLR16);
+
+  // ── LEFT QF column (2 matches) ──
+  const qfL = col('0 0 130px');
+  qfL.style.justifyContent = 'space-around';
+  qfL.style.padding = '48px 0 10px';
+  const lQFLabel = document.createElement('div');
+  lQFLabel.style.cssText = 'font-size:11px;font-weight:bold;color:#1a3a5c;text-align:center;padding:2px 0;';
+  lQFLabel.textContent = 'רבע גמר';
+  qfL.appendChild(lQFLabel);
+  for (let i = 8; i < 10; i++) qfL.appendChild(matchDiv(i));
+  B.appendChild(qfL);
+
+  // connector L QF→SF
+  const connLQF = col('0 0 16px');
+  connLQF.style.justifyContent = 'space-around';
+  connLQF.style.padding = '60px 0 10px';
+  for (let i = 0; i < 2; i++) {
+    const g = document.createElement('div');
+    g.style.cssText = 'display:flex;flex-direction:column;flex:1;justify-content:center;';
+    const top = document.createElement('div');
+    top.style.cssText = 'flex:1;border-bottom:2px solid #90a4ae;border-right:2px solid #90a4ae;';
+    const bot = document.createElement('div');
+    bot.style.cssText = 'flex:1;border-right:2px solid #90a4ae;';
+    g.appendChild(top); g.appendChild(bot);
+    connLQF.appendChild(g);
+  }
+  B.appendChild(connLQF);
+
+  // ── LEFT SF column (1 match) ──
+  const sfL = col('0 0 130px');
+  sfL.style.justifyContent = 'center';
+  sfL.style.paddingTop = '30px';
+  const lSFLabel = document.createElement('div');
+  lSFLabel.style.cssText = 'font-size:11px;font-weight:bold;color:#1a3a5c;text-align:center;padding:2px 0;';
+  lSFLabel.textContent = 'חצי גמר';
+  sfL.appendChild(lSFLabel);
+  sfL.appendChild(matchDiv(12));
+  B.appendChild(sfL);
+
+  // connector L SF→Final
+  const connLSF = col('0 0 16px');
+  connLSF.style.justifyContent = 'center';
+  connLSF.style.paddingTop = '30px';
+  const gLSF = document.createElement('div');
+  gLSF.style.cssText = 'display:flex;flex-direction:column;flex:0 0 56px;justify-content:center;';
+  const tLSF = document.createElement('div');
+  tLSF.style.cssText = 'flex:1;border-bottom:2px solid #90a4ae;border-right:2px solid #90a4ae;';
+  const bLSF = document.createElement('div');
+  bLSF.style.cssText = 'flex:1;border-right:2px solid #90a4ae;';
+  gLSF.appendChild(tLSF); gLSF.appendChild(bLSF);
+  connLSF.appendChild(gLSF);
+  B.appendChild(connLSF);
+
+  // ── CENTER column (Final + 3rd place) ──
+  const center = col('1 1 auto');
+  center.style.alignItems = 'center';
+  center.style.justifyContent = 'center';
+  center.style.gap = '20px';
+  center.style.padding = '10px 4px';
+
+  const finalLabel = document.createElement('div');
+  finalLabel.style.cssText = 'font-size:14px;font-weight:bold;color:#1a3a5c;text-align:center;';
+  finalLabel.textContent = 'גמר';
+  center.appendChild(finalLabel);
+  center.appendChild(matchDiv(15));
+
+  const thirdLabel = document.createElement('div');
+  thirdLabel.style.cssText = 'font-size:12px;font-weight:bold;color:#555;text-align:center;margin-top:16px;';
+  thirdLabel.textContent = 'מקום 3 vs מקום 4';
+  center.appendChild(thirdLabel);
+  center.appendChild(matchDiv(14));
+
+  B.appendChild(center);
+
+  // ── RIGHT SF→Final connector ──
+  const connRSF = col('0 0 16px');
+  connRSF.style.justifyContent = 'center';
+  connRSF.style.paddingTop = '30px';
+  const gRSF = document.createElement('div');
+  gRSF.style.cssText = 'display:flex;flex-direction:column;flex:0 0 56px;justify-content:center;';
+  const tRSF = document.createElement('div');
+  tRSF.style.cssText = 'flex:1;border-bottom:2px solid #90a4ae;border-left:2px solid #90a4ae;';
+  const bRSF = document.createElement('div');
+  bRSF.style.cssText = 'flex:1;border-left:2px solid #90a4ae;';
+  gRSF.appendChild(tRSF); gRSF.appendChild(bRSF);
+  connRSF.appendChild(gRSF);
+  B.appendChild(connRSF);
+
+  // ── RIGHT SF column (1 match) ──
+  const sfR = col('0 0 130px');
+  sfR.style.justifyContent = 'center';
+  sfR.style.paddingTop = '30px';
+  const rSFLabel = document.createElement('div');
+  rSFLabel.style.cssText = 'font-size:11px;font-weight:bold;color:#1a3a5c;text-align:center;padding:2px 0;';
+  rSFLabel.textContent = 'חצי גמר';
+  sfR.appendChild(rSFLabel);
+  sfR.appendChild(matchDiv(13));
+  B.appendChild(sfR);
+
+  // connector R SF←QF
+  const connRQF = col('0 0 16px');
+  connRQF.style.justifyContent = 'space-around';
+  connRQF.style.padding = '60px 0 10px';
+  for (let i = 0; i < 2; i++) {
+    const g = document.createElement('div');
+    g.style.cssText = 'display:flex;flex-direction:column;flex:1;justify-content:center;';
+    const top = document.createElement('div');
+    top.style.cssText = 'flex:1;border-bottom:2px solid #90a4ae;border-left:2px solid #90a4ae;';
+    const bot = document.createElement('div');
+    bot.style.cssText = 'flex:1;border-left:2px solid #90a4ae;';
+    g.appendChild(top); g.appendChild(bot);
+    connRQF.appendChild(g);
+  }
+  B.appendChild(connRQF);
+
+  // ── RIGHT QF column (2 matches) ──
+  const qfR = col('0 0 130px');
+  qfR.style.justifyContent = 'space-around';
+  qfR.style.padding = '48px 0 10px';
+  const rQFLabel = document.createElement('div');
+  rQFLabel.style.cssText = 'font-size:11px;font-weight:bold;color:#1a3a5c;text-align:center;padding:2px 0;';
+  rQFLabel.textContent = 'רבע גמר';
+  qfR.appendChild(rQFLabel);
+  for (let i = 10; i < 12; i++) qfR.appendChild(matchDiv(i));
+  B.appendChild(qfR);
+
+  // connector R QF←R16
+  const connRR16 = col('0 0 16px');
+  connRR16.style.justifyContent = 'space-around';
+  connRR16.style.padding = '32px 0 10px';
+  for (let i = 0; i < 4; i++) {
+    const g = document.createElement('div');
+    g.style.cssText = 'display:flex;flex-direction:column;flex:1;justify-content:center;';
+    const top = document.createElement('div');
+    top.style.cssText = 'flex:1;border-bottom:2px solid #90a4ae;border-left:2px solid #90a4ae;';
+    const bot = document.createElement('div');
+    bot.style.cssText = 'flex:1;border-left:2px solid #90a4ae;';
+    g.appendChild(top); g.appendChild(bot);
+    connRR16.appendChild(g);
+  }
+  B.appendChild(connRR16);
+
+  // ── RIGHT R16 column (4 matches) ──
+  const r16R = col('0 0 140px');
+  r16R.style.justifyContent = 'space-around';
+  r16R.style.padding = '10px 0';
+  const rR16Label = document.createElement('div');
+  rR16Label.style.cssText = 'font-size:11px;font-weight:bold;color:#1a3a5c;text-align:center;padding:2px 0;';
+  rR16Label.textContent = 'שמינית גמר';
+  r16R.appendChild(rR16Label);
+  for (let i = 4; i < 8; i++) r16R.appendChild(matchDiv(i));
+  B.appendChild(r16R);
+}
+</script>
+</body>
+</html>
