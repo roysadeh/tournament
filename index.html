@@ -456,20 +456,22 @@ function resetAll() {
 
 // ─── SCORE GENERATION ────────────────────────────────────────────────────────
 function generateScore(winnerIsT1) {
-  const wGoals = [1,1,1,2,2,2,3,3,4,5];
-  const lGoals = [0,0,0,1,1,1,2,2,3];
   const usePen = Math.random() < 0.22;
   if (usePen) {
-    const draw = lGoals[Math.floor(Math.random() * lGoals.length)];
+    const draw = [0,0,0,1,1,1,2,2,3][Math.floor(Math.random() * 9)];
     const penOptions = [[4,2],[4,3],[5,3],[5,4],[3,1],[6,5],[3,2],[5,2]];
     const ps = penOptions[Math.floor(Math.random() * penOptions.length)];
     return winnerIsT1
       ? { g1: draw, g2: draw, pen: { p1: ps[0], p2: ps[1] } }
       : { g1: draw, g2: draw, pen: { p1: ps[1], p2: ps[0] } };
   }
-  const w = wGoals[Math.floor(Math.random() * wGoals.length)];
-  const l = lGoals[Math.floor(Math.random() * lGoals.length)];
-  return winnerIsT1 ? { g1: w, g2: l, pen: null } : { g1: l, g2: w, pen: null };
+  // מבטיח שלמנצח תמיד יש יותר גולים
+  const loseG = [0,0,0,0,1,1,1,2,2,3][Math.floor(Math.random() * 10)];
+  const diff  = [1,1,1,2,2,3][Math.floor(Math.random() * 6)];
+  const winG  = loseG + diff;
+  return winnerIsT1
+    ? { g1: winG, g2: loseG, pen: null }
+    : { g1: loseG, g2: winG, pen: null };
 }
 
 // ─── PLAY ────────────────────────────────────────────────────────────────────
